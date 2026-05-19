@@ -173,7 +173,8 @@ function HabitCard({
   user,
   onToggle,
   onFreeze,
-  onDetails
+  onDetails,
+  onAdapt
 }: { 
   habit: Habit; 
   entries: HabitEntry[]; 
@@ -181,44 +182,57 @@ function HabitCard({
   onToggle: (habitId: number) => Promise<void> | void;
   onFreeze: (habitId: number) => Promise<void> | void;
   onDetails: (habitId: number) => void;
+  onAdapt?: (habit: Habit) => void;
 }) {
-  const todayEntry = entries.find(e => e.habit_id === habit.id && isToday(parseISO(e.date)));
+  const todayDate = format(startOfToday(), 'yyyy-MM-dd');
+  const todayEntry = entries.find(e => e.habitId === habit.id && e.date === todayDate);
   const isCompleted = !!todayEntry?.completed;
-  const isFrozen = !!todayEntry?.is_freeze;
+  const isFrozen = !!todayEntry?.isFreeze;
+
+  const isStruggling = React.useMemo(() => {
+    if (habit.isAdapted) return false;
+    const hEntries = entries.filter(e => e.habitId === habit.id).sort((a,b) => b.date.localeCompare(a.date));
+    const recent = hEntries.slice(0, 7);
+    if (recent.length < 3) return false;
+    
+    const completionRate = recent.filter(e => e.completed || e.isFreeze).length / recent.length;
+    const hasBadMood = recent.some(e => ['sad', 'tired', 'frustrated', 'stressed', '😰', '😢', '😫', '😴'].includes(e.mood || ''));
+    
+    return completionRate < 0.6 || hasBadMood;
+  }, [habit.id, entries, habit.isAdapted]);
 
   // Improved Streak calculation (consecutive days)
   const currentStreak = React.useMemo(() => {
     const habitEntries = entries
-      .filter(e => e.habit_id === habit.id && (e.completed || e.is_freeze))
+      .filter(e => e.habitId === habit.id && (e.completed || e.isFreeze))
       .sort((a, b) => b.date.localeCompare(a.date));
     
     if (habitEntries.length === 0) return 0;
     
-    const today = startOfToday();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const today = format(startOfToday(), 'yyyy-MM-dd');
+    const yesterdayDate = new Date(startOfToday());
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = format(yesterdayDate, 'yyyy-MM-dd');
     
-    const hasToday = habitEntries.some(e => isSameDay(parseISO(e.date), today));
-    const hasYesterday = habitEntries.some(e => isSameDay(parseISO(e.date), yesterday));
+    const hasToday = habitEntries.some(e => e.date === today);
+    const hasYesterday = habitEntries.some(e => e.date === yesterday);
     
     if (!hasToday && !hasYesterday) return 0;
     
     let streak = 0;
-    let checkDate = hasToday ? today : yesterday;
+    let currentDate = hasToday ? new Date(startOfToday()) : yesterdayDate;
     
-    // Simple loop to find consecutive days
-    const entryDates = new Set(habitEntries.map(e => format(parseISO(e.date), 'yyyy-MM-dd')));
+    const entryDates = new Set(habitEntries.map(e => e.date));
     
-    while (entryDates.has(format(checkDate, 'yyyy-MM-dd'))) {
+    while (entryDates.has(format(currentDate, 'yyyy-MM-dd'))) {
       streak++;
-      checkDate = new Date(checkDate);
-      checkDate.setDate(checkDate.getDate() - 1);
+      currentDate.setDate(currentDate.getDate() - 1);
     }
     
     return streak;
   }, [habit.id, entries]);
 
-  const target = habit.target_streak || 7;
+  const target = habit.targetStreak || 7;
   const progressPercent = Math.min((currentStreak / target) * 100, 100);
   const remaining = Math.max(target - currentStreak, 0);
 
@@ -256,7 +270,7 @@ function HabitCard({
           </p>
         </div>
 
-        {!isCompleted && (isFrozen || user.freezes_count > 0) && (
+        {!isCompleted && (isFrozen || user.freezesCount > 0) && (
           <button 
             onClick={(e) => { e.stopPropagation(); onFreeze(habit.id); }}
             className={cn(
@@ -294,7 +308,7 @@ function HabitCard({
               className="h-full bg-gradient-to-r from-sprout-olive to-emerald-400"
             />
           </div>
-          {habit.target_streak > 0 && (
+          {habit.targetStreak > 0 && (
             <div className="absolute -top-1.5 right-0 flex flex-col items-end">
               <div className="w-0.5 h-5 bg-neutral-200 dark:bg-neutral-700" />
               <span className="text-[8px] font-bold text-neutral-400 mt-1">ЦЕЛЬ: {target}</span>
@@ -303,8 +317,33 @@ function HabitCard({
         </div>
       </div>
       
+      {isStruggling && (
+        <motion.div 
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-1 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-2xl flex items-center justify-between gap-3 group/adapt shadow-sm"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <BrainCircuit className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-200">Sprout AI Помощь</span>
+              <span className="text-[10px] text-amber-600/80 font-medium leading-none mt-0.5">Кажется, это трудно?</span>
+            </div>
+          </div>
+          <button 
+            onClick={() => onAdapt?.(habit)}
+            className="px-4 py-2 bg-amber-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-xl hover:bg-amber-700 hover:shadow-md transition-all active:scale-95"
+          >
+            Упростить
+          </button>
+        </motion.div>
+      )}
+
       <div className="flex items-center gap-3 pt-1">
-        {Boolean(habit.is_adapted) && (
+        {Boolean(habit.isAdapted) && (
           <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-semibold uppercase tracking-wider">
             <Sparkles className="w-3 h-3" />
             Адаптация
@@ -341,14 +380,14 @@ function SmartStatusNotice({
   onShowSummary?: () => void
 }) {
   const todayDate = format(startOfToday(), 'yyyy-MM-dd');
-  const finishedToday = habits.length > 0 && habits.every(h => entries.some(e => e.habit_id === h.id && e.date === todayDate && (e.completed || e.is_freeze)));
+  const finishedToday = habits.length > 0 && habits.every(h => entries.some(e => e.habitId === h.id && e.date === todayDate && (e.completed || e.isFreeze)));
 
   // Find a habit that might need adaptation (missed at least 2 of the last 3 days)
   const strugglingHabit = habits.find(h => {
-    if (h.is_adapted) return false;
+    if (h.isAdapted) return false;
     // Check last week of entries for this habit
-    const hEntries = entries.filter(e => e.habit_id === h.id).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 7);
-    const completionRate = hEntries.filter(e => e.completed || e.is_freeze).length / (hEntries.length || 1);
+    const hEntries = entries.filter(e => e.habitId === h.id).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 7);
+    const completionRate = hEntries.filter(e => e.completed || e.isFreeze).length / (hEntries.length || 1);
     return hEntries.length >= 3 && completionRate < 0.5;
   });
 
@@ -583,7 +622,7 @@ function CalendarView({
           const isSelectedMonth = isSameMonth(day, currentMonth);
           const isTodayDay = isToday(day);
           const dayEntries = entries.filter(e => isSameDay(parseISO(e.date), day));
-          const completedCount = dayEntries.filter(e => e.completed || e.is_freeze).length;
+          const completedCount = dayEntries.filter(e => e.completed || e.isFreeze).length;
           const totalHabits = habits.length;
           const isFutureDate = isFuture(day);
 
@@ -605,9 +644,9 @@ function CalendarView({
               
               <div className="grid grid-cols-4 gap-1.5">
                 {habits.slice(0, 8).map(habit => {
-                  const entry = dayEntries.find(e => e.habit_id === habit.id);
+                  const entry = dayEntries.find(e => e.habitId === habit.id);
                   const isDone = entry?.completed;
-                  const isFrozen = entry?.is_freeze;
+                  const isFrozen = entry?.isFreeze;
 
                   return (
                     <div 
@@ -669,8 +708,8 @@ export default function App() {
     setLoading(true);
     try {
       // Calculate completion rate for this habit
-      const hEntries = entries.filter(e => e.habit_id === habit.id);
-      const completionRate = hEntries.filter(e => e.completed || e.is_freeze).length / Math.max(hEntries.length, 1);
+      const hEntries = entries.filter(e => e.habitId === habit.id);
+      const completionRate = hEntries.filter(e => e.completed || e.isFreeze).length / Math.max(hEntries.length, 1);
       
       // Get most recent mood if available
       const latestMood = hEntries.sort((a,b) => b.date.localeCompare(a.date))[0]?.mood;
@@ -697,7 +736,7 @@ export default function App() {
       await api.updateHabit(adaptationTarget.id, {
         name: suggestedAdaptation.name,
         description: suggestedAdaptation.description,
-        is_adapted: true
+        isAdapted: true
       });
       addToast('Привычка успешно адаптирована!');
       setSuggestedAdaptation(null);
@@ -714,19 +753,17 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        if (api.getToken()) {
+        const token = api.getToken();
+        if (token) {
           const u = await api.getMe();
           setUser(u);
-          if (u.theme === 'dark') {
-            document.body.classList.add('dark');
-          } else {
-            document.body.classList.remove('dark');
-          }
-          loadData();
+        } else {
+          setLoading(false);
         }
       } catch (err) {
+        console.error('Init failed:', err);
         api.setToken(null);
-      } finally {
+        setUser(null);
         setLoading(false);
       }
     };
@@ -734,9 +771,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (user) {
+      if (user.theme === 'dark') {
+        document.body.classList.add('dark');
+      } else {
+        document.body.classList.remove('dark');
+      }
+      loadData();
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
     if (habits.length > 0) {
       const todayDate = format(startOfToday(), 'yyyy-MM-dd');
-      const finishedToday = habits.every(h => entries.some(e => e.habit_id === h.id && e.date === todayDate && (e.completed || e.is_freeze)));
+      const finishedToday = habits.every(h => entries.some(e => e.habitId === h.id && e.date === todayDate && (e.completed || e.isFreeze)));
       
       if (finishedToday && summaryShownDate !== todayDate) {
         setShowSummaryModal(true);
@@ -751,7 +800,7 @@ export default function App() {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
-        const missedYesterday = habits.some(habit => !entries.find(entry => entry.habit_id === habit.id && entry.date === yesterdayStr && (entry.completed || entry.is_freeze)));
+        const missedYesterday = habits.some(habit => !entries.find(entry => entry.habitId === habit.id && entry.date === yesterdayStr && (entry.completed || entry.isFreeze)));
         
         if (hour >= 20 || missedYesterday) {
           setShowAdaptationNotice(true);
@@ -790,17 +839,17 @@ export default function App() {
 
   const toggleHabit = async (habitId: number) => {
     const date = format(startOfToday(), 'yyyy-MM-dd');
-    const existing = entries.find(e => e.habit_id === habitId && e.date === date);
+    const existing = entries.find(e => e.habitId === habitId && e.date === date);
     
     try {
       if (existing) {
-        await api.deleteEntry({ habit_id: habitId, date });
+        await api.deleteEntry({ habitId, date });
         addToast('Привычка отменена', 'info');
         const u = await api.getMe(); // Refetch user in case it was a freeze refund
         setUser(u);
         loadData();
       } else {
-        await api.createEntry({ habit_id: habitId, date, completed: true });
+        await api.createEntry({ habitId, date, completed: true });
         addToast('Отлично сработано!');
         loadData();
       }
@@ -812,18 +861,18 @@ export default function App() {
 
   const freezeHabit = async (habitId: number) => {
     const date = format(startOfToday(), 'yyyy-MM-dd');
-    const existing = entries.find(e => e.habit_id === habitId && e.date === date);
+    const existing = entries.find(e => e.habitId === habitId && e.date === date);
 
     try {
-      if (existing && existing.is_freeze) {
-        await api.deleteEntry({ habit_id: habitId, date });
+      if (existing && existing.isFreeze) {
+        await api.deleteEntry({ habitId, date });
         addToast('Заморозка отменена', 'info');
         const u = await api.getMe();
         setUser(u);
         loadData();
       } else if (!existing) {
-        if (user && user.freezes_count > 0) {
-          await api.createEntry({ habit_id: habitId, date, is_freeze: true });
+        if (user && user.freezesCount > 0) {
+          await api.createEntry({ habitId, date, isFreeze: true });
           addToast('День заморожен ❄️');
           const u = await api.getMe();
           setUser(u);
@@ -879,7 +928,7 @@ export default function App() {
         >
           <div className="flex items-center gap-3 px-5 py-2.5 bg-blue-50/50 text-blue-600 rounded-3xl border border-blue-100/50 backdrop-blur-sm">
             <Snowflake className="w-5 h-5" />
-            <span className="font-bold text-lg">{user.freezes_count}</span>
+            <span className="font-bold text-lg">{user.freezesCount}</span>
           </div>
           <button 
             onClick={toggleTheme}
@@ -918,6 +967,10 @@ export default function App() {
                       onToggle={toggleHabit} 
                       onFreeze={freezeHabit}
                       onDetails={(id) => setSelectedHabitId(id)}
+                      onAdapt={(h) => {
+                        handleAdaptHabit(h);
+                        setShowAdaptationNotice(true);
+                      }}
                     />
                   </div>
                 ))}
@@ -1186,8 +1239,8 @@ function HabitDetailsModal({
   const [editMood, setEditMood] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [reminderTime, setReminderTime] = useState(habit.reminder_time || '');
-  const [reminderDays, setReminderDays] = useState<number[]>(habit.reminder_days ? JSON.parse(habit.reminder_days) : [0,1,2,3,4,5,6]);
+  const [reminderTime, setReminderTime] = useState(habit.reminderTime || '');
+  const [reminderDays, setReminderDays] = useState<number[]>(habit.reminderDays ? JSON.parse(habit.reminderDays) : [0,1,2,3,4,5,6]);
 
   const daysOfWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -1201,8 +1254,8 @@ function HabitDetailsModal({
     setLoading(true);
     try {
       await api.updateHabit(habit.id, {
-        reminder_time: reminderTime,
-        reminder_days: JSON.stringify(reminderDays)
+        reminderTime: reminderTime,
+        reminderDays: JSON.stringify(reminderDays)
       });
       addToast('Напоминания обновлены');
       setShowSettings(false);
@@ -1223,7 +1276,7 @@ function HabitDetailsModal({
   ];
 
   const habitEntries = entries
-    .filter(e => e.habit_id === habit.id)
+    .filter(e => e.habitId === habit.id)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleDeleteEntry = async (entryId: number) => {
@@ -1389,10 +1442,10 @@ function HabitDetailsModal({
                         <div className={cn(
                           "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
                           entry.completed ? "bg-sprout-olive text-white" : 
-                          entry.is_freeze ? "bg-blue-500 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400"
+                          entry.isFreeze ? "bg-blue-500 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400"
                         )}>
                           {entry.completed ? <CheckCircle2 className="w-5 h-5" /> : 
-                           entry.is_freeze ? <Snowflake className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                           entry.isFreeze ? <Snowflake className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
                         </div>
                         <div>
                           <div className="font-bold text-neutral-900 dark:text-white group">
@@ -1473,7 +1526,7 @@ function HabitDetailsModal({
                         </div>
                       </div>
                       
-                      {!!entry.is_freeze && (
+                      {!!entry.isFreeze && (
                         <span className="text-[9px] font-black uppercase tracking-tighter text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 mt-1.5">
                           Freeze
                         </span>
@@ -1500,7 +1553,7 @@ function DailySummaryModal({
   onClose: () => void 
 }) {
   const todayDate = format(startOfToday(), 'yyyy-MM-dd');
-  const finishedHabits = habits.filter(h => entries.some(e => e.habit_id === h.id && e.date === todayDate && (e.completed || e.is_freeze)));
+  const finishedHabits = habits.filter(h => entries.some(e => e.habitId === h.id && e.date === todayDate && (e.completed || e.isFreeze)));
   const progressPercent = habits.length > 0 ? (finishedHabits.length / habits.length) * 100 : 0;
 
   return (
@@ -1613,9 +1666,9 @@ function CreateHabitModal({ onClose, addToast, onCreated }: { onClose: () => voi
         name, 
         description: desc, 
         frequency: 'daily', 
-        target_streak: hasTarget ? target : 0,
-        reminder_time: showReminders ? reminderTime : undefined,
-        reminder_days: showReminders ? JSON.stringify(reminderDays) : undefined
+        targetStreak: hasTarget ? target : 0,
+        reminderTime: showReminders ? reminderTime : undefined,
+        reminderDays: showReminders ? JSON.stringify(reminderDays) : undefined
       });
       addToast('Привычка создана! В добрый путь.');
       onCreated();

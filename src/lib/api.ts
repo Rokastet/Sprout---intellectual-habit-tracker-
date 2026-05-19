@@ -9,35 +9,35 @@ export interface User {
   id: number;
   email: string;
   displayName: string;
-  freezes_count: number;
+  freezesCount: number;
   theme: 'light' | 'dark';
 }
 
 export interface Habit {
   id: number;
-  user_id: number;
+  userId: number;
   name: string;
   description: string;
   frequency: 'daily' | 'weekly';
   category: string;
   level: number;
-  target_streak: number;
-  is_adapted: boolean;
-  reminder_time?: string;
-  reminder_days?: string;
-  created_at: string;
+  targetStreak: number;
+  isAdapted: boolean;
+  reminderTime?: string;
+  reminderDays?: string;
+  createdAt: string;
 }
 
 export interface HabitEntry {
   id: number;
-  habit_id: number;
-  user_id: number;
+  habitId: number;
+  userId: number;
   date: string;
   completed: boolean;
-  is_freeze: boolean;
+  isFreeze: boolean;
   notes: string;
   mood?: string;
-  adapted_from?: string;
+  adaptedFrom?: string;
 }
 
 class SproutAPI {
@@ -115,8 +115,8 @@ class SproutAPI {
     return this.request('/entries', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  async deleteEntry(data: { habit_id: number, date: string }): Promise<void> {
-    const params = new URLSearchParams({ habit_id: data.habit_id.toString(), date: data.date });
+  async deleteEntry(data: { habitId: number, date: string }): Promise<void> {
+    const params = new URLSearchParams({ habitId: data.habitId.toString(), date: data.date });
     return this.request(`/entries?${params.toString()}`, { method: 'DELETE' });
   }
 
