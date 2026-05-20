@@ -7,6 +7,11 @@ import { fileURLToPath } from 'url';
 import { db } from './src/db/index.ts';
 import * as schema from './src/db/schema.ts';
 import { eq, and, gte, desc, sql, count } from 'drizzle-orm';
+import dotenv from 'dotenv';
+dotenv.config();
+import { GoogleGenAI, Type } from '@google/genai';
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'sprout-secret-key-123';
 
@@ -271,10 +276,117 @@ async function startServer() {
     });
   });
 
-  app.get('/api/achievements', authenticateToken, async (req: any, res) => {
-    const userAchievements = await db.select().from(schema.achievements).where(eq(schema.achievements.userId, req.user.id));
-    res.json(userAchievements);
+  app.post('/api/ai/adapt', authenticateToken, async (req: any, res: any) => {
+    const { name, description, completionRate, mood, missReason } = req.body;
+    
+    const prompt = `
+      The user is trying to form the habit: "${name}" (${description || ''}).
+      
+      Context:
+      - Miss reason: ${missReason || 'Not specified'}
+      - Current mood: ${mood || 'Not specified'}
+      - Recent completion rate: ${completionRate ? (completionRate * 100).toFixed(0) + '%' : 'Unknown'}
+      
+      Act as a supportive, gentle psychological coach.
+      
+      If their completion rate is low, suggest a "Micro-version" that takes less than 2 minutes.
+      If their mood is low, suggest something more restorative.
+      If they are doing well but feeling overwhelmed, suggest a slight simplification to prevent burnout.
+      
+      The goal is to maintain the streak without the pressure of the full task.
+      
+      Respond in JSON format:
+      {
+        "name": "The adjusted habit name",
+        "description": "Short description of what to do",
+        "reason": "A supportive message in Russian explaining why this helps based on their mood/performance"
+      }
+    `;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              description: { type: Type.STRING },
+              reason: { type: Type.STRING },
+            },
+            required: ["name", "description", "reason"]
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text || '{}');
+      res.json({
+        name: data.name || name,
+        description: data.description || description,
+        reason: data.reason || "Каждое маленькое усилие сегодня поможет завтра."
+      });
+    } catch (error: any) {
+      console.error("Gemini adaptation error:", error);
+      res.json({
+        name,
+        description,
+        reason: "Даже небольшое усилие сегодня поможет завтра."
+      });
+    }
   });
+
+  app.post('/api/ai/breakdown', authenticateToken, async (req: any, res: any) => {
+    const { goal } = req.body;
+    if (!goal) {
+      return res.status(400).json({ error: "Goal is required" });
+    }
+
+    const prompt = `
+      User goal: "${goal}".
+      Break this into 3 levels of habits:
+      1. Level 1: Micro-habit (takes 2 minutes)
+      2. Level 2: Regular habit (takes 15-30 minutes)
+      3. Level 3: Advanced habit (full practice)
+      
+      Respond in JSON format as an array of objects with 'name', 'description', and 'reason'.
+      The response must be in Russian language.
+    `;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                description: { type: Type.STRING },
+                reason: { type: Type.STRING },
+              },
+              required: ["name", "description", "reason"]
+            }
+          }
+        }
+      });
+
+      const parsed = JSON.parse(response.text || '[]');
+      res.json(parsed);
+    } catch (error) {
+      console.error("Gemini breakdown error:", error);
+      res.json([
+        { name: "Микро-версия", description: `${goal} — делать по 2 минуты в день`, reason: "Начните с малого, чтобы преодолеть прокрастинацию." },
+        { name: "Обычная версия", description: `${goal} — делать по 15 минут в день`, reason: "Оптимальный уровень нагрузки для закрепления привычки." },
+        { name: "Продвинутая версия", description: `${goal} — полноценное выполнение`, reason: "Максимальный результат при стабильной практике." }
+      ]);
+    }
+  });
+
 
   app.post('/api/entries', authenticateToken, async (req: any, res: any) => {
     const { habitId, date, completed, notes, adaptedFrom, isFreeze, mood } = req.body;
@@ -298,26 +410,6 @@ async function startServer() {
           mood,
           adaptedFrom: adaptedFrom,
         }).returning().all();
-
-        // Achievement logic
-        const [entryCount]: any = tx.select({ count: count() }).from(schema.entries).where(eq(schema.entries.userId, userId)).all();
-        
-        const checkAchievement = (type: string) => {
-          const [existing] = tx.select().from(schema.achievements).where(and(eq(schema.achievements.userId, userId), eq(schema.achievements.type, type))).limit(1).all();
-          if (!existing) {
-            tx.insert(schema.achievements).values({ userId, type }).run();
-          }
-        };
-
-        if (Number(entryCount.count) >= 1) checkAchievement('FIRST_STEP');
-        if (Number(entryCount.count) >= 10) checkAchievement('TEN_STEPS');
-        if (isFreeze) checkAchievement('ICE_AGE');
-
-        const hour = new Date().getHours();
-        if (hour < 8) checkAchievement('EARLY_BIRD');
-
-        const [habitCount]: any = tx.select({ count: count() }).from(schema.habits).where(eq(schema.habits.userId, userId)).all();
-        if (Number(habitCount.count) >= 5) checkAchievement('HABIT_MASTER');
 
         return newEntry;
       });

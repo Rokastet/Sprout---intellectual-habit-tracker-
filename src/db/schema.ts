@@ -38,9 +38,3 @@ export const entries = sqliteTable('entries', {
   adaptedFrom: text('adapted_from'),
 });
 
-export const achievements = sqliteTable('achievements', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  type: text('type').notNull(),
-  unlockedAt: text('unlocked_at').default(new Date().toISOString()),
-});

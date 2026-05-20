@@ -132,9 +132,14 @@ class SproutAPI {
     return this.request('/stats');
   }
 
-  async getAchievements(): Promise<any[]> {
-    return this.request('/achievements');
+  async aiAdapt(data: { name: string, description: string, completionRate: number, mood?: string, missReason?: string }): Promise<any> {
+    return this.request('/ai/adapt', { method: 'POST', body: JSON.stringify(data) });
   }
+
+  async aiBreakdown(goal: string): Promise<any[]> {
+    return this.request('/ai/breakdown', { method: 'POST', body: JSON.stringify({ goal }) });
+  }
+
 }
 
 export const api = new SproutAPI();

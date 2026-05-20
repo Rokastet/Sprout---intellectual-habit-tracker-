@@ -17,7 +17,6 @@ import {
   ChevronLeft,
   TrendingUp,
   BrainCircuit,
-  Trophy,
   BarChart3,
   Snowflake,
   Moon,
@@ -31,7 +30,6 @@ import {
   Quote
 } from 'lucide-react';
 import { api, type User, type Habit, type HabitEntry } from './lib/api';
-import { geminiService } from './services/gemini';
 import { cn } from './lib/utils';
 import { 
   format, 
@@ -429,7 +427,7 @@ function SmartStatusNotice({
               className="w-14 h-14 bg-white/10 backdrop-blur-md flex items-center justify-center rounded-2xl shrink-0 border border-white/10"
             >
               {finishedToday ? 
-                <Trophy className="w-7 h-7 text-white" /> : 
+                <Sparkles className="w-7 h-7 text-white" /> : 
                 suggestion ?
                 <Sparkles className="w-8 h-8 text-white" /> :
                 strugglingHabit ? 
@@ -695,7 +693,6 @@ export default function App() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [entries, setEntries] = useState<HabitEntry[]>([]);
   const [stats, setStats] = useState<any>(null);
-  const [achievements, setAchievements] = useState<any[]>([]);
   const [view, setView] = useState<'dashboard' | 'calendar' | 'stats' | 'journal'>('dashboard');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [journalSearch, setJournalSearch] = useState('');
@@ -728,7 +725,9 @@ export default function App() {
       // Get most recent mood if available
       const latestMood = hEntries.sort((a,b) => b.date.localeCompare(a.date))[0]?.mood;
 
-      const suggestion = await geminiService.adaptHabit(habit.name, habit.description, {
+      const suggestion = await api.aiAdapt({
+        name: habit.name,
+        description: habit.description,
         completionRate,
         mood: latestMood
       });
@@ -835,16 +834,14 @@ export default function App() {
 
   const loadData = async () => {
     try {
-      const [h, e, s, a] = await Promise.all([
+      const [h, e, s] = await Promise.all([
         api.getHabits(), 
         api.getEntries(),
-        api.getStats(),
-        api.getAchievements()
+        api.getStats()
       ]);
       setHabits(h);
       setEntries(e);
       setStats(s);
-      setAchievements(a);
     } catch (err) {
       console.error('Failed to load data:', err);
       // Don't toast here as it's a background fetch usually
@@ -2013,7 +2010,7 @@ function DailySummaryModal({
             transition={{ type: "spring", delay: 0.2 }}
             className="w-24 h-24 bg-sprout-olive text-white rounded-3xl mx-auto flex items-center justify-center mb-8 shadow-xl shadow-sprout-olive/20"
           >
-            <Trophy className="w-12 h-12" />
+            <Sparkles className="w-12 h-12" />
           </motion.div>
 
           <h3 className="text-4xl font-serif mb-4 leading-tight">Итоги вашего дня</h3>
@@ -2125,7 +2122,7 @@ function CreateHabitModal({ onClose, addToast, onCreated }: { onClose: () => voi
   const getAiHelp = async () => {
     if (!name) return;
     setLoading(true);
-    const suggestions = await geminiService.breakdownGoal(name);
+    const suggestions = await api.aiBreakdown(name);
     setAiSuggestions(suggestions);
     setLoading(false);
   };
