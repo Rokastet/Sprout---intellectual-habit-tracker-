@@ -61,6 +61,14 @@ import {
 
 // --- Sub-components ---
 
+export const CATEGORY_MAP: Record<string, { label: string, emoji: string, color: string, bg: string }> = {
+  sport: { label: 'Спорт', emoji: '🏃‍♂️', color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/20' },
+  health: { label: 'Здоровье', emoji: '🍏', color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/20' },
+  mind: { label: 'Разум', emoji: '🧠', color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-950/20' },
+  work: { label: 'Работа', emoji: '💼', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/20' },
+  other: { label: 'Другое', emoji: '✨', color: 'text-neutral-600', bg: 'bg-neutral-50 dark:bg-neutral-850' }
+};
+
 function AuthForm({ onAuth }: { onAuth: (user: User) => void }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -232,8 +240,8 @@ function HabitCard({
     return streak;
   }, [habit.id, entries]);
 
-  const target = habit.targetStreak || 7;
-  const progressPercent = Math.min((currentStreak / target) * 100, 100);
+  const target = !habit.targetStreak || Number.isNaN(Number(habit.targetStreak)) ? 7 : Number(habit.targetStreak);
+  const progressPercent = target > 0 ? Math.min((currentStreak / target) * 100, 100) : 0;
   const remaining = Math.max(target - currentStreak, 0);
 
   return (
@@ -262,8 +270,11 @@ function HabitCard({
         </motion.div>
         
         <div className="flex-1">
-          <h3 className={cn("text-2xl sm:text-3xl font-serif mb-1 transition-all", (isCompleted || isFrozen) ? "text-neutral-400 line-through" : "text-sprout-olive dark:text-white")}>
-            {habit.name}
+          <h3 className={cn("text-2xl sm:text-3xl font-serif mb-1 transition-all flex items-center gap-2", (isCompleted || isFrozen) ? "text-neutral-400 line-through" : "text-sprout-olive dark:text-white")}>
+            <span className="text-xl sm:text-2xl select-none" title={CATEGORY_MAP[habit.category || 'other']?.label}>
+              {CATEGORY_MAP[habit.category || 'other']?.emoji || '✨'}
+            </span>
+            <span>{habit.name}</span>
           </h3>
           <p className="text-neutral-500 dark:text-neutral-400 text-sm font-medium line-clamp-1">
             {habit.description}
@@ -685,7 +696,10 @@ export default function App() {
   const [entries, setEntries] = useState<HabitEntry[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [achievements, setAchievements] = useState<any[]>([]);
-  const [view, setView] = useState<'dashboard' | 'calendar' | 'stats' | 'achievements'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'calendar' | 'stats' | 'journal'>('dashboard');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [journalSearch, setJournalSearch] = useState('');
+  const [journalMoodFilter, setJournalMoodFilter] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [summaryShownDate, setSummaryShownDate] = useState<string | null>(localStorage.getItem('sprout_summary_date'));
@@ -916,7 +930,7 @@ export default function App() {
           <p className="text-neutral-600 dark:text-neutral-400 text-lg sm:text-2xl mt-4 font-serif italic">
             {view === 'dashboard' ? `Сегодня ${format(new Date(), 'EEEE, d MMMM')}` : 
              view === 'calendar' ? 'Ваш календарь привычек' :
-             view === 'stats' ? 'Ваш прогресс в деталях' : 'Достигнутые высоты'}
+             view === 'stats' ? 'Ваш прогресс в деталях' : 'Ваш личный журнал заметок'}
           </p>
         </motion.div>
         
@@ -957,23 +971,69 @@ export default function App() {
             >
               <QuoteOfTheDay />
               
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none">
+                <button
+                  onClick={() => setSelectedCategoryFilter('all')}
+                  className={cn(
+                    "px-4 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all border shrink-0",
+                    selectedCategoryFilter === 'all'
+                      ? "bg-sprout-olive text-white border-transparent shadow-md shadow-sprout-olive/20"
+                      : "bg-white dark:bg-sprout-dark-card text-neutral-400 border-neutral-100 dark:border-sprout-dark-border hover:border-sprout-soft"
+                  )}
+                >
+                  Все ({habits.length})
+                </button>
+                {Object.entries(CATEGORY_MAP).map(([key, cat]) => {
+                  const count = habits.filter(h => h.category === key).length;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedCategoryFilter(key)}
+                      className={cn(
+                        "px-4 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 shrink-0",
+                        selectedCategoryFilter === key
+                          ? "bg-sprout-olive text-white border-transparent shadow-md shadow-sprout-olive/20"
+                          : "bg-white dark:bg-sprout-dark-card text-neutral-400 border-neutral-100 dark:border-sprout-dark-border hover:border-sprout-soft"
+                      )}
+                    >
+                      <span className="text-sm">{cat.emoji}</span>
+                      <span>{cat.label} ({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {habits.map((habit) => (
-                  <div key={habit.id}>
-                    <HabitCard 
-                      habit={habit} 
-                      entries={entries} 
-                      user={user}
-                      onToggle={toggleHabit} 
-                      onFreeze={freezeHabit}
-                      onDetails={(id) => setSelectedHabitId(id)}
-                      onAdapt={(h) => {
-                        handleAdaptHabit(h);
-                        setShowAdaptationNotice(true);
-                      }}
-                    />
-                  </div>
-                ))}
+                {(() => {
+                  const filteredHabits = habits.filter(h => selectedCategoryFilter === 'all' || h.category === selectedCategoryFilter);
+                  
+                  return (
+                    <>
+                      {filteredHabits.map((habit) => (
+                        <div key={habit.id}>
+                          <HabitCard 
+                            habit={habit} 
+                            entries={entries} 
+                            user={user}
+                            onToggle={toggleHabit} 
+                            onFreeze={freezeHabit}
+                            onDetails={(id) => setSelectedHabitId(id)}
+                            onAdapt={(h) => {
+                              handleAdaptHabit(h);
+                              setShowAdaptationNotice(true);
+                            }}
+                          />
+                        </div>
+                      ))}
+                      {filteredHabits.length === 0 && habits.length > 0 && (
+                        <div className="col-span-1 md:col-span-2 text-center py-12 px-6 bg-white dark:bg-sprout-dark-card rounded-3xl border border-neutral-100 dark:border-neutral-800">
+                          <p className="text-neutral-400 text-sm">В этой категории пока нет привычек.</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
@@ -1064,44 +1124,281 @@ export default function App() {
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              {/* Mood Correlation Analysis */}
+              <div className="sprout-card p-8">
+                <h3 className="text-2xl mb-2 flex items-center gap-2">
+                  <span>🧠</span>
+                  <span>Влияние настроения на привычки</span>
+                </h3>
+                <p className="text-neutral-500 dark:text-neutral-400 text-sm mb-6">
+                  Анализ вашей продуктивности в зависимости от эмоционального состояния.
+                </p>
+
+                {(() => {
+                  const totalMoodEntries = entries.filter(e => e.mood);
+                  const moodsList = [
+                    { emoji: '😊', value: 'great', label: 'Прекрасно', color: 'bg-emerald-500' },
+                    { emoji: '💪', value: 'strong', label: 'Бодро', color: 'bg-blue-500' },
+                    { emoji: '😐', value: 'neutral', label: 'Обычное', color: 'bg-neutral-500' },
+                    { emoji: '😫', value: 'tired', label: 'Устал(а)', color: 'bg-amber-500' },
+                    { emoji: '😔', value: 'sad', label: 'Грустно', color: 'bg-red-500' },
+                  ];
+
+                  const moodStats = moodsList.map(item => {
+                    const matched = entries.filter(e => e.mood === item.value);
+                    const completed = matched.filter(e => e.completed).length;
+                    const completionRate = matched.length > 0 ? Math.round((completed / matched.length) * 100) : 0;
+                    return {
+                      ...item,
+                      count: matched.length,
+                      completionRate,
+                    };
+                  }).filter(st => st.count > 0);
+
+                  if (moodStats.length === 0) {
+                    return (
+                      <div className="p-6 bg-neutral-50 dark:bg-neutral-800/20 rounded-2xl border border-neutral-100 dark:border-neutral-800/50 text-center">
+                        <p className="text-neutral-500 dark:text-neutral-400 text-sm">
+                          💡 <strong>Мало данных для анализа.</strong> Начните чаще записывать своё настроение при выполнении привычек! Для этого кликайте по кнопке привычки в Дневнике или при обновлении записей.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  // Find highest and lowest productive moods
+                  const sortedProductive = [...moodStats].sort((a,b) => b.completionRate - a.completionRate);
+                  const bestMood = sortedProductive[0];
+                  const worstMood = sortedProductive[sortedProductive.length - 1];
+
+                  return (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-5 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20 flex gap-4 items-center">
+                          <span className="text-3xl p-2 bg-white dark:bg-neutral-800 rounded-xl shadow-xs leading-none select-none">🎉</span>
+                          <div>
+                            <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Пик продуктивности</div>
+                            <div className="text-sm font-medium mt-1">
+                              Когда у вас <strong>{bestMood.label} {bestMood.emoji}</strong>, вы выполняете <strong>{bestMood.completionRate}%</strong> привычек!
+                            </div>
+                          </div>
+                        </div>
+
+                        {sortedProductive.length > 1 && (
+                          <div className="p-5 bg-amber-50/50 dark:bg-amber-950/10 rounded-2xl border border-amber-100/50 dark:border-amber-900/20 flex gap-4 items-center">
+                            <span className="text-3xl p-2 bg-white dark:bg-neutral-800 rounded-xl shadow-xs leading-none select-none">⚠️</span>
+                            <div>
+                              <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Зона спада</div>
+                              <div className="text-sm font-medium mt-1">
+                                В состоянии <strong>{worstMood.label} {worstMood.emoji}</strong> ваша продуктивность падает до <strong>{worstMood.completionRate}%</strong>.
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Выполняемость привычек по настроениям:</div>
+                        {moodStats.map(m => (
+                          <div key={m.value} className="space-y-2">
+                            <div className="flex justify-between items-center text-sm font-medium">
+                              <span className="flex items-center gap-2">
+                                <span className="text-lg select-none">{m.emoji}</span>
+                                <span>{m.label} <span className="text-xs text-neutral-400">({m.count} раз)</span></span>
+                              </span>
+                              <span>{m.completionRate}% выполнено</span>
+                            </div>
+                            <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                              <div 
+                                className={cn("h-full rounded-full transition-all duration-500", m.color)}
+                                style={{ width: `${m.completionRate}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </motion.div>
           )}
 
-          {view === 'achievements' && (
+          {view === 'journal' && (
             <motion.div 
-              key="achievements"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+              key="journal"
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -25 }}
+              className="space-y-6"
             >
-              {[
-                { type: 'FIRST_STEP', title: 'Первый шаг', desc: 'Выполнена первая привычка', icon: Trophy, color: 'bg-[#E3DCC8] text-[#7A5C33] dark:bg-[#2D4F37]/30 dark:text-[#E2E8DE]' },
-                { type: 'TEN_STEPS', title: 'Десятка', desc: 'Выполнено 10 привычек', icon: CheckCircle2, color: 'bg-[#D1E2D1] text-[#2D4F37] dark:bg-[#1A3C34]/30' },
-                { type: 'ICE_AGE', title: 'Ледниковый период', desc: 'Использована первая заморозка', icon: Snowflake, color: 'bg-[#D9E6EB] text-[#4A7380] dark:bg-[#23302C]/30' },
-                { type: 'STREAK_7', title: 'Неделя без прогулов', desc: 'Выдержана серия из 7 дней', icon: TrendingUp, color: 'bg-[#F2DEC9] text-[#A67C52] dark:bg-[#4A5D23]/30' },
-                { type: 'HABIT_MASTER', title: 'Мастер привычек', desc: 'Создано 5 привычек', icon: BrainCircuit, color: 'bg-[#DED9F2] text-[#6B5AAB] dark:bg-[#1D1A16]/30' },
-                { type: 'EARLY_BIRD', title: 'Ранняя пташка', desc: 'Запись до 8:00 утра', icon: Sun, color: 'bg-[#F2F2D9] text-[#A6A652] dark:bg-[#141210]/30' },
-              ].map((ach) => {
-                const isUnlocked = achievements.some(a => a.type === ach.type);
-                return (
-                  <div key={ach.type} className={cn(
-                    "sprout-card p-6 flex items-center gap-6",
-                    isUnlocked ? "bg-white dark:bg-sprout-dark-card" : "bg-neutral-100 dark:bg-neutral-900 opacity-50 grayscale"
-                  )}>
-                    <div className={cn("w-16 h-16 flex items-center justify-center rounded-3xl shrink-0", ach.color)}>
-                      <ach.icon className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h4 className="text-xl">{ach.title}</h4>
-                      <p className="text-neutral-500 text-xs mt-1">{ach.desc}</p>
-                      {isUnlocked && (
-                        <div className="text-[10px] text-green-600 font-bold uppercase mt-2">Разблокировано</div>
-                      )}
-                    </div>
+              {/* Journal Filters */}
+              <div className="bg-white dark:bg-sprout-dark-card p-6 rounded-[32px] border border-neutral-100 dark:border-sprout-dark-border space-y-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+                  <div className="flex-1">
+                    <input 
+                      type="text"
+                      placeholder="Поиск по вашим заметкам..."
+                      value={journalSearch}
+                      onChange={(e) => setJournalSearch(e.target.value)}
+                      className="w-full sprout-input text-sm py-3"
+                    />
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    <button
+                      onClick={() => setJournalMoodFilter(null)}
+                      className={cn(
+                        "px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all",
+                        journalMoodFilter === null 
+                          ? "bg-sprout-olive text-white" 
+                          : "bg-neutral-50 dark:bg-neutral-800 text-neutral-400"
+                      )}
+                    >
+                      Все
+                    </button>
+                    {[
+                      { emoji: '😊', value: 'great', label: 'Прекрасно' },
+                      { emoji: '😐', value: 'neutral', label: 'Обычное' },
+                      { emoji: '😫', value: 'tired', label: 'Устал(а)' },
+                      { emoji: '😔', value: 'sad', label: 'Грустно' },
+                      { emoji: '💪', value: 'strong', label: 'Бодро' },
+                    ].map(item => (
+                      <button
+                        key={item.value}
+                        title={item.label}
+                        onClick={() => setJournalMoodFilter(item.value)}
+                        className={cn(
+                          "w-10 h-10 flex items-center justify-center rounded-xl text-lg transition-all border",
+                          journalMoodFilter === item.value 
+                            ? "bg-sprout-olive text-white border-transparent shadow-md" 
+                            : "bg-white dark:bg-neutral-800 text-neutral-400 border-neutral-100 dark:border-neutral-700 hover:border-neutral-300"
+                        )}
+                      >
+                        {item.emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Journal List */}
+              <div className="space-y-4">
+                {(() => {
+                  const filteredEntries = entries
+                    .filter(e => {
+                      const habitExists = habits.some(h => h.id === e.habitId);
+                      const hasNotesOrMood = !!(e.notes || e.mood);
+                      return habitExists && hasNotesOrMood;
+                    })
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .filter(e => {
+                      const matchSearch = journalSearch 
+                        ? e.notes?.toLowerCase().includes(journalSearch.toLowerCase()) 
+                        : true;
+                      const matchMood = journalMoodFilter 
+                        ? e.mood === journalMoodFilter 
+                        : true;
+                      return matchSearch && matchMood;
+                    });
+
+                  if (filteredEntries.length === 0) {
+                    return (
+                      <div className="text-center py-16 px-6 bg-white dark:bg-sprout-dark-card rounded-[32px] border border-neutral-100 dark:border-sprout-dark-border">
+                        <div className="w-14 h-14 bg-neutral-50 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 text-neural-400">
+                          🗒️
+                        </div>
+                        <h4 className="text-xl font-serif text-neutral-800 dark:text-neutral-200 mb-2">Записи не найдены</h4>
+                        <p className="text-neutral-500 text-sm max-w-sm mx-auto">
+                          Записывайте ваши мысли и настроение при выполнении привычек, чтобы вести здесь свой ежедневный дневник.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return filteredEntries.map(entry => {
+                    const habit = habits.find(h => h.id === entry.habitId)!;
+                    const catInfo = CATEGORY_MAP[habit.category || 'other'];
+                    
+                    return (
+                      <div key={entry.id} className="sprout-card p-6 flex flex-col gap-4 bg-white dark:bg-sprout-dark-card border border-neutral-100 dark:border-sprout-dark-border transition-all hover:border-sprout-soft">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-neutral-400 dark:text-neutral-500">
+                              {format(parseISO(entry.date), 'dd MMMM yyyy, EEEE')}
+                            </span>
+                            <span className={cn("px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5", catInfo?.bg || 'bg-neutral-50', catInfo?.color || 'text-neutral-600')}>
+                              <span>{catInfo?.emoji}</span>
+                              <span>{habit.name}</span>
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => {
+                                // Direct entry notes edit
+                                const text = prompt('Редактировать заметку:', entry.notes || '');
+                                if (text === null) return;
+                                api.updateEntry(entry.id, { notes: text }).then(() => {
+                                  addToast('Записька обновлена!');
+                                  loadData();
+                                }).catch(() => {
+                                  addToast('Ошибка', 'error');
+                                });
+                              }}
+                              className="text-[10px] uppercase font-bold tracking-widest text-neutral-400 hover:text-sprout-olive"
+                            >
+                              Изменить
+                            </button>
+                            <button 
+                              onClick={() => {
+                                if (confirm('Очистить заметку и настроение для этой записи?')) {
+                                  api.updateEntry(entry.id, { notes: '', mood: '' }).then(() => {
+                                    addToast('Записька удалена', 'error');
+                                    loadData();
+                                  }).catch(() => {
+                                    addToast('Ошибка', 'error');
+                                  });
+                                }
+                              }}
+                              className="text-[10px] uppercase font-bold tracking-widest text-neutral-400 hover:text-red-500"
+                            >
+                              Очистить
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-4 items-start bg-neutral-50/50 dark:bg-neutral-800/10 p-4 rounded-2xl border border-neutral-100/50 dark:border-neutral-800/30">
+                          {entry.mood && (
+                            <div className="text-3xl p-1.5 bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-100/10">
+                              {(() => {
+                                const moods = [
+                                  { emoji: '😊', value: 'great' },
+                                  { emoji: '😐', value: 'neutral' },
+                                  { emoji: '😫', value: 'tired' },
+                                  { emoji: '😔', value: 'sad' },
+                                  { emoji: '💪', value: 'strong' },
+                                ];
+                                return moods.find(m => m.value === entry.mood)?.emoji || '😊';
+                              })()}
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            {entry.notes ? (
+                              <p className="text-neutral-700 dark:text-neutral-300 text-base leading-relaxed italic">
+                                "{entry.notes}"
+                              </p>
+                            ) : (
+                              <p className="text-neutral-400 text-sm italic">
+                                Без текстовой заметки (сохранено только настроение)
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1208,13 +1505,14 @@ export default function App() {
           <BarChart3 className="w-6 h-6" />
         </button>
         <button 
-          onClick={() => setView('achievements')}
+          onClick={() => setView('journal')}
           className={cn(
             "p-4 rounded-full transition-all",
-            view === 'achievements' ? "bg-sprout-olive text-white shadow-lg" : "text-neutral-400 hover:text-sprout-olive"
+            view === 'journal' ? "bg-sprout-olive text-white shadow-lg" : "text-neutral-400 hover:text-sprout-olive"
           )}
+          title="Дневник заметок"
         >
-          <Trophy className="w-6 h-6" />
+          <History className="w-6 h-6" />
         </button>
       </div>
     </div>
@@ -1243,6 +1541,35 @@ function HabitDetailsModal({
   const [reminderDays, setReminderDays] = useState<number[]>(habit.reminderDays ? JSON.parse(habit.reminderDays) : [0,1,2,3,4,5,6]);
 
   const daysOfWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(habit.name);
+  const [editDesc, setEditDesc] = useState(habit.description || '');
+  const [editTarget, setEditTarget] = useState(habit.targetStreak || 7);
+  const [editCategory, setEditCategory] = useState(habit.category || 'other');
+
+  const handleUpdateHabitDetails = async () => {
+    if (!editName.trim()) {
+      addToast('Название привычки не может быть пустым', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.updateHabit(habit.id, {
+        name: editName,
+        description: editDesc,
+        targetStreak: editTarget,
+        category: editCategory,
+      });
+      addToast('Привычка обновлена!');
+      setIsEditing(false);
+      onUpdate();
+    } catch (err) {
+      addToast('Ошибка обновления привычки', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleDay = (dayIndex: number) => {
     setReminderDays(prev => 
@@ -1348,6 +1675,21 @@ function HabitDetailsModal({
             </div>
             <div className="flex items-center gap-2">
               <button 
+                onClick={() => {
+                  setIsEditing(!isEditing);
+                  if (!isEditing) {
+                    setShowSettings(false);
+                  }
+                }}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  isEditing ? "bg-sprout-olive text-white shadow-lg shadow-sprout-olive/20" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 hover:text-neutral-600"
+                )}
+                title="Редактировать параметры"
+              >
+                <Edit2 className="w-5 h-5" />
+              </button>
+              <button 
                 onClick={handleDeleteHabit}
                 className="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-all"
                 title="Удалить привычку"
@@ -1355,7 +1697,12 @@ function HabitDetailsModal({
                 <Trash2 className="w-5 h-5" />
               </button>
               <button 
-                onClick={() => setShowSettings(!showSettings)}
+                onClick={() => {
+                  setShowSettings(!showSettings);
+                  if (!showSettings) {
+                    setIsEditing(false);
+                  }
+                }}
                 className={cn(
                   "p-2 rounded-xl transition-all",
                   showSettings ? "bg-sprout-olive text-white shadow-lg shadow-sprout-olive/20" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400"
@@ -1366,8 +1713,94 @@ function HabitDetailsModal({
               </button>
             </div>
           </div>
-          <h3 className="text-4xl font-serif mb-2">{habit.name}</h3>
-          <p className="text-neutral-600 dark:text-neutral-400 italic">{habit.description}</p>
+          
+          {isEditing ? (
+            <div className="space-y-4 bg-neutral-50 dark:bg-neutral-800/20 p-5 rounded-3xl border border-neutral-100 dark:border-neutral-800 mt-4">
+              <h4 className="text-xs font-black uppercase tracking-widest text-neutral-400">Параметры привычки</h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 ml-1">Название</label>
+                  <input 
+                    type="text" 
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="sprout-input w-full py-2.5 text-base"
+                    placeholder="Что вы хотите делать?"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 ml-1">Описание (необязательно)</label>
+                  <input 
+                    type="text" 
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    className="sprout-input w-full py-2.5 text-base"
+                    placeholder="Какая цель или почему важно?"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 ml-1">Серия (дней)</label>
+                    <input 
+                      type="number" 
+                      value={Number.isNaN(editTarget) ? '' : editTarget}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setEditTarget(Number.isNaN(val) ? 0 : val);
+                      }}
+                      className="sprout-input w-full py-2.5 text-base"
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 ml-1">Категория</label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="sprout-input w-full py-2.5 text-base cursor-pointer bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-700 font-bold"
+                    >
+                      {Object.entries(CATEGORY_MAP).map(([key, cat]) => (
+                        <option key={key} value={key}>
+                          {cat.emoji} {cat.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2.5 pt-2">
+                  <button 
+                    onClick={handleUpdateHabitDetails}
+                    disabled={loading}
+                    className="flex-1 bg-sprout-olive text-white py-3 rounded-2xl font-bold hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 text-xs uppercase tracking-wider"
+                  >
+                    {loading ? 'Секунду...' : 'Сохранить изменения'}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditName(habit.name);
+                      setEditDesc(habit.description || '');
+                      setEditTarget(habit.targetStreak || 7);
+                      setEditCategory(habit.category || 'other');
+                    }}
+                    className="px-5 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 rounded-2xl font-bold transition-all text-xs uppercase tracking-wider hover:bg-neutral-300"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <h3 className="text-4xl font-serif mb-2 flex items-center gap-2.5">
+                <span className="text-3xl leading-none select-none" title={CATEGORY_MAP[habit.category || 'other']?.label}>
+                  {CATEGORY_MAP[habit.category || 'other']?.emoji}
+                </span>
+                <span>{habit.name}</span>
+              </h3>
+              <p className="text-neutral-600 dark:text-neutral-400 italic text-sm">{habit.description || 'Нет описания'}</p>
+            </div>
+          )}
         </div>
 
         <AnimatePresence>
@@ -1649,6 +2082,7 @@ function DailySummaryModal({
 function CreateHabitModal({ onClose, addToast, onCreated }: { onClose: () => void, addToast: (msg: string, type?: 'success' | 'error' | 'info') => void, onCreated: () => void }) {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
+  const [category, setCategory] = useState('other');
   const [hasTarget, setHasTarget] = useState(true);
   const [target, setTarget] = useState(7);
   const [loading, setLoading] = useState(false);
@@ -1667,6 +2101,7 @@ function CreateHabitModal({ onClose, addToast, onCreated }: { onClose: () => voi
         description: desc, 
         frequency: 'daily', 
         targetStreak: hasTarget ? target : 0,
+        category,
         reminderTime: showReminders ? reminderTime : undefined,
         reminderDays: showReminders ? JSON.stringify(reminderDays) : undefined
       });
@@ -1736,6 +2171,28 @@ function CreateHabitModal({ onClose, addToast, onCreated }: { onClose: () => voi
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-2.5 ml-2">Категория привычки</label>
+            <div className="grid grid-cols-2 xs:flex xs:flex-wrap gap-2">
+              {Object.entries(CATEGORY_MAP).map(([key, cat]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCategory(key)}
+                  className={cn(
+                    "px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 border",
+                    category === key
+                      ? "bg-sprout-olive text-white border-transparent shadow-lg shadow-sprout-olive/20"
+                      : "bg-neutral-50 dark:bg-neutral-800 text-neutral-500 border-neutral-100 dark:border-neutral-700 hover:border-neutral-300"
+                  )}
+                >
+                  <span className="text-sm leading-none">{cat.emoji}</span>
+                  <span>{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <div className="flex items-center justify-between mb-2 ml-2">
               <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Цель серии (дней)</label>
               <button 
@@ -1751,8 +2208,11 @@ function CreateHabitModal({ onClose, addToast, onCreated }: { onClose: () => voi
             {hasTarget && (
               <input 
                 type="number" 
-                value={target}
-                onChange={(e) => setTarget(parseInt(e.target.value))}
+                value={Number.isNaN(target) ? '' : target}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setTarget(Number.isNaN(val) ? 0 : val);
+                }}
                 className="w-full sprout-input text-lg" 
                 min={1}
               />

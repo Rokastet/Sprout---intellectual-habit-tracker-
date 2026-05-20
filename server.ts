@@ -159,7 +159,7 @@ async function startServer() {
   });
 
   app.patch('/api/habits/:id', authenticateToken, async (req: any, res) => {
-    const { name, description, level, isAdapted, targetStreak, reminderTime, reminderDays } = req.body;
+    const { name, description, level, isAdapted, targetStreak, reminderTime, reminderDays, category } = req.body;
     await db.update(schema.habits).set({
       name,
       description,
@@ -168,6 +168,7 @@ async function startServer() {
       targetStreak: targetStreak,
       reminderTime: reminderTime,
       reminderDays: reminderDays,
+      category,
     }).where(and(eq(schema.habits.id, Number(req.params.id)), eq(schema.habits.userId, req.user.id)));
     
     res.json({ success: true });
