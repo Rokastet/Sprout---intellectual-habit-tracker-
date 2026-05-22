@@ -18,15 +18,15 @@
 
 @layer base {
   body {
-    @apply bg-sprout-bg text-neutral-900 font-sans antialiased transition-colors duration-500 selection:bg-sprout-olive/10;
+    @apply bg-sprout-bg text-stone-800 font-sans antialiased tracking-[-0.01em] transition-colors duration-500 selection:bg-sprout-olive/10;
   }
 
   body.dark {
-    @apply bg-sprout-dark-bg text-sprout-dark-text selection:bg-white/10;
+    @apply bg-sprout-dark-bg text-sprout-dark-text tracking-normal selection:bg-white/10;
   }
   
   h1, h2, h3, h4 {
-    @apply font-serif font-bold text-sprout-olive tracking-tight transition-colors;
+    @apply font-serif font-semibold text-sprout-olive tracking-[-0.01em] leading-tight transition-colors;
   }
 
   .dark h1, .dark h2, .dark h3, .dark h4 {
@@ -34,8 +34,22 @@
   }
 }
 
+/* Beautiful color mapping for a warm, cozy light theme with a biophilic feel */
+.text-neutral-500 {
+  @apply text-stone-500/90 dark:text-neutral-400;
+}
+.text-neutral-600 {
+  @apply text-stone-600 dark:text-neutral-300;
+}
+.text-neutral-400 {
+  @apply text-stone-400 dark:text-neutral-500;
+}
+.text-neutral-300 {
+  @apply text-stone-300/80 dark:text-neutral-600;
+}
+
 .sprout-card {
-  @apply bg-white dark:bg-sprout-dark-card rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-sprout-soft dark:border-sprout-dark-border transition-all duration-300;
+  @apply bg-white dark:bg-sprout-dark-card rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] border border-sprout-soft dark:border-sprout-dark-border transition-all duration-300;
 }
 
 .dark .sprout-card {
@@ -43,10 +57,10 @@
 }
 
 .sprout-button {
-  @apply bg-sprout-olive text-white dark:bg-white dark:text-neutral-900 rounded-[20px] px-8 py-4 font-semibold hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none;
+  @apply bg-sprout-olive text-white dark:bg-white dark:text-neutral-900 rounded-[20px] px-8 py-4 font-semibold tracking-wide hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none;
 }
 
 .sprout-input {
-  @apply bg-white dark:bg-sprout-dark-card border border-sprout-soft dark:border-sprout-dark-border text-neutral-900 dark:text-sprout-dark-text rounded-[20px] px-6 py-4 focus:outline-none focus:ring-2 focus:ring-sprout-olive/10 dark:focus:ring-white/10 transition-all font-medium;
+  @apply bg-white dark:bg-sprout-dark-card border border-sprout-soft dark:border-sprout-dark-border text-stone-800 dark:text-sprout-dark-text rounded-[20px] px-6 py-4 focus:outline-none focus:ring-2 focus:ring-sprout-olive/10 dark:focus:ring-white/10 transition-all font-medium;
 }
 

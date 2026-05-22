@@ -1069,50 +1069,50 @@ export default function App() {
                   <div className="text-white/60 text-sm font-medium uppercase tracking-wider mb-2">Всего выполнено</div>
                   <div className="text-6xl font-serif">{stats.totalCompleted}</div>
                 </div>
-                <div className="sprout-card p-8">
-                  <div className="text-neutral-500 dark:text-neutral-400 text-sm font-medium uppercase tracking-wider mb-2">Активных привычек</div>
-                  <div className="text-6xl font-serif text-sprout-olive dark:text-white">{stats.activeHabits}</div>
+                <div className="p-8 bg-sprout-olive dark:bg-neutral-800 rounded-[32px] text-white shadow-lg">
+                  <div className="text-white/60 text-sm font-medium uppercase tracking-wider mb-2">Активных привычек</div>
+                  <div className="text-6xl font-serif">{stats.activeHabits}</div>
                 </div>
               </div>
 
-              <div className="sprout-card p-8">
-                <h3 className="text-2xl mb-6">Активность за последние 7 дней</h3>
+              <div className="p-8 bg-sprout-olive dark:bg-neutral-800 rounded-[32px] text-white shadow-lg">
+                <h3 className="text-2xl mb-6 text-white font-serif font-semibold">Активность за последние 7 дней</h3>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={stats.dailyStats}>
                           <defs>
                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={user?.theme === 'dark' ? '#FFF' : '#1B4332'} stopOpacity={0.2}/>
-                              <stop offset="95%" stopColor={user?.theme === 'dark' ? '#FFF' : '#1B4332'} stopOpacity={0}/>
+                              <stop offset="5%" stopColor="#FFF" stopOpacity={0.25}/>
+                              <stop offset="95%" stopColor="#FFF" stopOpacity={0}/>
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={user?.theme === 'dark' ? '#1E2E2A' : '#E5E7EB'} />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.12)" />
                           <XAxis 
                             dataKey="date" 
                             axisLine={false} 
                             tickLine={false} 
-                            tick={{ fill: user?.theme === 'dark' ? '#9CA3AF' : '#6B7280', fontSize: 12, fontWeight: 500 }} 
+                            tick={{ fill: 'rgba(255, 255, 255, 0.7)', fontSize: 12, fontWeight: 500 }} 
                             tickFormatter={(val) => format(parseISO(val), 'dd.MM')}
                           />
                           <YAxis 
                             axisLine={false} 
                             tickLine={false} 
-                            tick={{ fill: user?.theme === 'dark' ? '#9CA3AF' : '#6B7280', fontSize: 12, fontWeight: 500 }} 
+                            tick={{ fill: 'rgba(255, 255, 255, 0.7)', fontSize: 12, fontWeight: 500 }} 
                           />
                           <Tooltip 
                             contentStyle={{ 
                               borderRadius: '16px', 
-                              border: 'none', 
-                              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                              backgroundColor: user?.theme === 'dark' ? '#121D1B' : '#FFFDFB',
-                              color: user?.theme === 'dark' ? '#E2E8DE' : '#1B4332'
+                              border: '1px solid rgba(255, 255, 255, 0.15)', 
+                              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)',
+                              backgroundColor: 'rgba(18, 29, 27, 0.95)',
+                              color: '#FFFFFF'
                             }}
                             labelFormatter={(val) => format(parseISO(val), 'd MMMM')}
                           />
                           <Area 
                             type="monotone" 
                             dataKey="count" 
-                            stroke={user?.theme === 'dark' ? '#FFF' : '#1B4332'} 
+                            stroke="#FFF" 
                             strokeWidth={3}
                             fillOpacity={1} 
                             fill="url(#colorCount)" 
@@ -1123,12 +1123,12 @@ export default function App() {
               </div>
 
               {/* Mood Correlation Analysis */}
-              <div className="sprout-card p-8">
-                <h3 className="text-2xl mb-2 flex items-center gap-2">
+              <div className="p-8 bg-sprout-olive dark:bg-neutral-800 rounded-[32px] text-white shadow-lg">
+                <h3 className="text-2xl mb-2 flex items-center gap-2 text-white font-serif font-semibold">
                   <span>🧠</span>
                   <span>Влияние настроения на привычки</span>
                 </h3>
-                <p className="text-neutral-500 dark:text-neutral-400 text-sm mb-6">
+                <p className="text-white/70 text-sm mb-6">
                   Анализ вашей продуктивности в зависимости от эмоционального состояния.
                 </p>
 
@@ -1155,8 +1155,8 @@ export default function App() {
 
                   if (moodStats.length === 0) {
                     return (
-                      <div className="p-6 bg-neutral-50 dark:bg-neutral-800/20 rounded-2xl border border-neutral-100 dark:border-neutral-800/50 text-center">
-                        <p className="text-neutral-500 dark:text-neutral-400 text-sm">
+                      <div className="p-6 bg-white/5 dark:bg-white/5 rounded-2xl border border-white/10 text-center">
+                        <p className="text-white/80 text-sm">
                           💡 <strong>Мало данных для анализа.</strong> Начните чаще записывать своё настроение при выполнении привычек! Для этого кликайте по кнопке привычки в Дневнике или при обновлении записей.
                         </p>
                       </div>
@@ -1171,10 +1171,10 @@ export default function App() {
                   return (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-5 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20 flex gap-4 items-center">
-                          <span className="text-3xl p-2 bg-white dark:bg-neutral-800 rounded-xl shadow-xs leading-none select-none">🎉</span>
+                        <div className="p-5 bg-white/10 dark:bg-black/10 rounded-2xl border border-white/10 flex gap-4 items-center">
+                          <span className="text-3xl p-2 bg-white/10 dark:bg-neutral-800/40 rounded-xl shadow-xs leading-none select-none">🎉</span>
                           <div>
-                            <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Пик продуктивности</div>
+                            <div className="text-xs font-bold text-white/60 uppercase tracking-widest">Пик продуктивности</div>
                             <div className="text-sm font-medium mt-1">
                               Когда у вас <strong>{bestMood.label} {bestMood.emoji}</strong>, вы выполняете <strong>{bestMood.completionRate}%</strong> привычек!
                             </div>
@@ -1182,10 +1182,10 @@ export default function App() {
                         </div>
 
                         {sortedProductive.length > 1 && (
-                          <div className="p-5 bg-amber-50/50 dark:bg-amber-950/10 rounded-2xl border border-amber-100/50 dark:border-amber-900/20 flex gap-4 items-center">
-                            <span className="text-3xl p-2 bg-white dark:bg-neutral-800 rounded-xl shadow-xs leading-none select-none">⚠️</span>
+                          <div className="p-5 bg-white/10 dark:bg-black/10 rounded-2xl border border-white/10 flex gap-4 items-center">
+                            <span className="text-3xl p-2 bg-white/10 dark:bg-neutral-800/40 rounded-xl shadow-xs leading-none select-none">⚠️</span>
                             <div>
-                              <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Зона спада</div>
+                              <div className="text-xs font-bold text-white/60 uppercase tracking-widest">Зона спада</div>
                               <div className="text-sm font-medium mt-1">
                                 В состоянии <strong>{worstMood.label} {worstMood.emoji}</strong> ваша продуктивность падает до <strong>{worstMood.completionRate}%</strong>.
                               </div>
@@ -1195,17 +1195,17 @@ export default function App() {
                       </div>
 
                       <div className="space-y-4">
-                        <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Выполняемость привычек по настроениям:</div>
+                        <div className="text-xs font-bold text-white/60 uppercase tracking-wider">Выполняемость привычек по настроениям:</div>
                         {moodStats.map(m => (
                           <div key={m.value} className="space-y-2">
                             <div className="flex justify-between items-center text-sm font-medium">
                               <span className="flex items-center gap-2">
                                 <span className="text-lg select-none">{m.emoji}</span>
-                                <span>{m.label} <span className="text-xs text-neutral-400">({m.count} раз)</span></span>
+                                <span>{m.label} <span className="text-xs text-white/50">({m.count} раз)</span></span>
                               </span>
                               <span>{m.completionRate}% выполнено</span>
                             </div>
-                            <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
                               <div 
                                 className={cn("h-full rounded-full transition-all duration-500", m.color)}
                                 style={{ width: `${m.completionRate}%` }}
