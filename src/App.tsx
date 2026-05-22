@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { api, type User, type Habit, type HabitEntry } from './lib/api';
 import { cn } from './lib/utils';
+import { CbtCoach } from './components/CbtCoach';
 import { 
   format, 
   isToday, 
@@ -1218,6 +1219,8 @@ export default function App() {
                   );
                 })()}
               </div>
+
+              <CbtCoach />
             </motion.div>
           )}
 

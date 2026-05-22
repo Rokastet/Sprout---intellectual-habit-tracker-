@@ -140,6 +140,10 @@ class SproutAPI {
     return this.request('/ai/breakdown', { method: 'POST', body: JSON.stringify({ goal }) });
   }
 
+  async aiCoach(message: string, history: any[]): Promise<{ reply: string }> {
+    return this.request('/ai/coach', { method: 'POST', body: JSON.stringify({ message, history }) });
+  }
+
 }
 
 export const api = new SproutAPI();

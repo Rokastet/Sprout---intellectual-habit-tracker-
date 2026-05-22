@@ -11,7 +11,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { GoogleGenAI, Type } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY || '',
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || 'sprout-secret-key-123';
 
@@ -384,6 +391,94 @@ async function startServer() {
         { name: "Обычная версия", description: `${goal} — делать по 15 минут в день`, reason: "Оптимальный уровень нагрузки для закрепления привычки." },
         { name: "Продвинутая версия", description: `${goal} — полноценное выполнение`, reason: "Максимальный результат при стабильной практике." }
       ]);
+    }
+  });
+
+  app.post('/api/ai/coach', authenticateToken, async (req: any, res: any) => {
+    const { message, history } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const userId = req.user.id;
+
+    try {
+      // 1. Fetch user info
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+      
+      // 2. Fetch habits
+      const habitsList = await db.select().from(schema.habits).where(eq(schema.habits.userId, userId));
+      
+      // 3. Fetch recent entries (last 14 days)
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      const fourteenDaysAgoStr = fourteenDaysAgo.toISOString().split('T')[0];
+      
+      const recentEntries = await db.select().from(schema.entries).where(
+        and(
+          eq(schema.entries.userId, userId),
+          gte(schema.entries.date, fourteenDaysAgoStr)
+        )
+      );
+
+      // Analyze patterns
+      const completedCount = recentEntries.filter(e => e.completed).length;
+      const frozenCount = recentEntries.filter(e => e.isFreeze).length;
+      const moodCounts: Record<string, number> = {};
+      recentEntries.forEach(e => {
+        if (e.mood) {
+          moodCounts[e.mood] = (moodCounts[e.mood] || 0) + 1;
+        }
+      });
+      const topMood = Object.entries(moodCounts).sort((a,b) => b[1] - a[1])[0]?.[0] || 'нейтральное';
+
+      // Build context
+      const habitsContext = habitsList.map(h => `- ${h.name} (${h.category || 'общая'})`).join('\n');
+      const statsContext = `
+      - Всего активных привычек: ${habitsList.length}
+      - Выполнено за последние 14 дней: ${completedCount}
+      - Использовано заморозок: ${frozenCount}
+      - Преобладающее настроение: ${topMood}
+      `;
+
+      const prompt = `
+      Ты — Интеллектуальный CBT-чат-коуч по имени Sprout Coach для пользователя по имени ${user?.displayName || 'Пользователь'}.
+      Твоя цель — оказывать когнитивно-поведенческую поддержку под привычки пользователя.
+
+      Контекст пользователя:
+      ${statsContext}
+
+      Текущие привычки пользователя:
+      ${habitsContext || 'У пользователя пока нет привычек.'}
+
+      История сообщений в текущем сеансе (для контекста):
+      ${(history || []).slice(-10).map((h: any) => `${h.role === 'user' ? 'Пользователь' : 'Коуч'}: ${h.content}`).join('\n')}
+      
+      Новое сообщение пользователя:
+      "${message}"
+
+      Инструкции для генерации ответа:
+      1. Избегай банальных советов вроде "просто сделай это" или "соберись".
+      2. Применяй принципы Когнитивно-Поведенческой Терапии (CBT / КПТ):
+         - Помоги выявить автоматические мысли (например, "я должен всё делать идеально или вообще не делать", "у меня ничего не получится", "я слишком устал, чтобы сделать хоть что-то").
+         - Мягко оспорь эти когнитивные искажения (черно-белое мышление, катастрофизация, сверхобобщение).
+         - Предложи конкретную рефрейминг-технику поддержки.
+      3. Обязательно свяжи ответ с его реальными привычками, предложив адаптировать одну из них под его текущее состояние (например, сделать "микро-шаг" — почитать 2 минуты вместо 1 часа, поприседать 5 раз вместо тренировки). Поощри пользователя не сдаваться и напомни, что маленькие шаги строят большие результаты.
+      4. Используй дружелюбный, тёплый, поддерживающий, но профессиональный тон в духе КПТ-терапевта. Сделай акцент на то, что лень или усталость — это нормальные сигналы организма, а не провал.
+      5. Текст должен быть структурирован красивыми короткими абзацами, списками с буллетами или жирными ключевыми словами. Сделай его очень легким для быстрого чтения и восприятия при сильной усталости.
+      6. Отвечай только на русском языке.
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+      });
+
+      const reply = response.text || "Извините, сейчас я испытываю трудности с ответом. Попробуйте сформулировать мысль иначе — я всегда готов вас выслушать.";
+      res.json({ reply });
+    } catch (error: any) {
+      console.error("Gemini coach error:", error);
+      res.status(500).json({ error: "Не удалось получить совет от коуча." });
     }
   });
 
