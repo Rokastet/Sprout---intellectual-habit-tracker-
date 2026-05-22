@@ -2,8 +2,38 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import * as schema from './schema.ts';
 import path from 'path';
+import os from 'os';
+import fs from 'fs';
 
-const sqlite = new Database('/tmp/sprout.db');
+// Resolves a persistent temp/system-temp database path safely on both Windows and Unix
+const getDbPath = () => {
+  if (process.env.DATABASE_PATH) {
+    return process.env.DATABASE_PATH;
+  }
+  
+  // Try to use Unix standard '/tmp' directory first
+  try {
+    if (process.platform !== 'win32') {
+      fs.mkdirSync('/tmp', { recursive: true });
+      return '/tmp/sprout.db';
+    }
+  } catch (e) {
+    // Ignore and fallback
+  }
+
+  // Fallback to the system's temporary directory (guaranteed to exist and be writable on Windows and other OSes)
+  const tempDir = os.tmpdir();
+  const dbPath = path.join(tempDir, 'sprout.db');
+  try {
+    fs.mkdirSync(tempDir, { recursive: true });
+  } catch (e) {
+    // Ignore and fallback
+  }
+  return dbPath;
+};
+
+const dbPath = getDbPath();
+const sqlite = new Database(dbPath);
 sqlite.pragma('journal_mode = WAL');
 
 // Programmatic schema initialization (guarantees tables exist without index collision)
