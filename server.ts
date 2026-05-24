@@ -20,6 +20,111 @@ const ai = new GoogleGenAI({
   }
 });
 
+function getLocalCbtFallback(message: string, displayName: string, habitsList: any[]): string {
+  const msgLower = message.toLowerCase();
+  const habitsNames = habitsList.length > 0 
+    ? habitsList.map((h: any) => `«${h.name}»`).join(', ') 
+    : 'ваших текущих привычек';
+  
+  const habitsBullets = habitsList.length > 0
+    ? habitsList.slice(0, 3).map((h: any) => `- **${h.name}**: попробовать супер-лёгкую версию на 1-2 минуты (например, ${h.description || 'просто открыть приложение/материалы для привычки'}).`).join('\n')
+    : '- **Сделайте микро-шаг**: уделите любой намеченной задаче всего 2 минуты, чтобы запустить привычку без напряжения.';
+
+  let topicReply = '';
+
+  if (msgLower.includes('лень') || msgLower.includes('прокрастин') || msgLower.includes('не хочу') || msgLower.includes('не могу')) {
+    topicReply = `### 🌿 Преодолеваем лень через КПТ-рефрейминг
+
+Привет, **${displayName}**! Я заметил твою отметку усталости. Мысль «Мне лень делать это сегодня» — это классический барьер ума, черно-белое мышление («все или ничего»).
+
+Давай попробуем мягко изменить наше отношение:
+- **Автоматическая ловушка**: «Если я не сделаю это идеально и полностью, то нет смысла даже начинать».
+- **Реалистичный рефрейминг**: Одно маленькое действие сегодня гораздо ценнее идеального часа, который не состоялся. Маленькие шаги строят привычки.
+- **Решение**: Редуцируй сложность. Выполни микро-версию за 2 минуты.
+
+### 🌱 Твоё бережное решение на сегодня:
+${habitsBullets}
+
+*Помни: поддерживать цепочку привычек даже на минимальной сложности — это огромный вклад в твое долгосрочное развитие!*`;
+  }
+  else if (msgLower.includes('энерг') || msgLower.includes('устал') || msgLower.includes('нет сил') || msgLower.includes('выгорел') || msgLower.includes('без сил')) {
+    topicReply = `### 🔋 Восстановление баланса при дефиците сил
+
+Дорогой **${displayName}**, ощущение полного отсутствия энергии — это сигнал от твоего тела, а не повод для самобичевания. В КПТ мы называем это ловушкой катастрофизации.
+
+Давай оспорим это искажение:
+- **Автоматическая мысль**: «Раз у меня нет сил сейчас, значит, я никогда не смогу выработать привычки и наладить жизнь».
+- **Поддерживающий рефрейминг**: «Моя энергия колеблется — это естественно. Сейчас отличный момент, чтобы позаботиться о себе через восстанавливающую микро-версию привычки, не перегружая нервную систему».
+- **Действие**: Сегодня мы заменим твои привычки на супер-лёгкие аналоги, чтобы сберечь твой streak!
+
+### 🛋️ Твой восстановительный план:
+${habitsBullets}
+
+*Твоя главная победа сегодня — сохранить непрерывность дня, дав себе право на отдых. Завтра будет новый день, и силы обязательно вернутся.*`;
+  }
+  else if (msgLower.includes('получится') || msgLower.includes('боюсь') || msgLower.includes('страх') || msgLower.includes('не смогу') || msgLower.includes('провал')) {
+    topicReply = `### 🧠 Работа со страхом неудачи
+
+Привет, **${displayName}**! Страх «У меня ничего не получится» — это классическая ловушка ума (предсказание будущего и сверхобобщение).
+
+Давай разберем это с помощью фактов:
+- **Автоматическая мысль**: «Какая разница, что я делаю, всё равно я заброшу и ничего не выйдет в итоге».
+- **Реалистичный ответ**: Прошлые неудачи не определяют будущее. Сейчас у тебя есть **Sprout**, наглядный трекер, статистика и готовая методология микро-шагов.
+- **Решение**: Позволь себе совершать ошибки. Идеальной траектории не существует.
+
+### 🪜 Начни с малого:
+${habitsBullets}
+
+*В КПТ мы говорим: уверенность рождается из маленьких действий, а не наоборот. Просто начни с самого маленького шага.*`;
+  }
+  else if (msgLower.includes('времен') || msgLower.includes('занят') || msgLower.includes('часы') || msgLower.includes('секунд')) {
+    topicReply = `### ⏱️ Эффективное управление временем по КПТ
+
+Здравствуй, **${displayName}**! Ощущение «Совсем нет свободного времени» вызывает тревогу и заставляет откладывать привычки. Это искажение «Всё или ничего».
+
+Давай перепишем эту мысль:
+- **Автоматическая мысль**: «Если у меня нет целого часа свободного времени, нет смысла делать хоть что-то».
+- **Альтернативный взгляд**: Время — это пластичный ресурс. Даже 60 секунд лучше, чем ноль. Для мозга важнее сам факт запуска действия, чем его продолжительность.
+
+### ⚡ Микро-привычки:
+${habitsBullets}
+
+*Твоя задача сегодня — не стать идеальным, а просто сделать минимальный отпечаток привычки в графике.*`;
+  }
+  else if (msgLower.includes('бросить') || msgLower.includes('задолбало') || msgLower.includes('бесит') || msgLower.includes('сдаться')) {
+    topicReply = `### 🚩 Преодоление эмоционального выгорания
+
+Привет, **${displayName}**. Мысль «Я хочу бросить всё» возникает на пике усталости или когда мы ставим себе слишком жесткие планки. Это реакция бунта против жестких требований к себе.
+
+Давай остановимся и сделаем вдох-выдох:
+- **Автоматическая мысль**: «Привычки — это кандалы, они меня душат, лучше со всем завязать».
+- **Рефрейминг**: «Привычки — это не обязанность, а способ любить себя и заботиться о своем здоровье. Мне не нужно бросать всё, мне просто нужен качественный отдых и облегчённый режим».
+- **Действие**: Используй функцию **"Заморозка привычки"** прямо в Sprout на сегодня, либо сделай ультра-микроверсию без чувства вины.
+
+### 🌱 План сохранения цепочки:
+${habitsBullets}
+
+*Запомни: Sprout — это твой оазис и бережная зона развития, а не школа с оценками. Отдых — это тоже часть прогресса.*`;
+  }
+  else {
+    topicReply = `### 🌿 Индивидуальный КПТ-разбор от Sprout
+
+Привет, **${displayName}**! Спасибо, что поделился своими мыслями. Это важный шаг к саморефлексии.
+
+В когнитивно-поведенческой терапии мы всегда смотрим на мысли критически и с поддержкой:
+- **Осознание**: Твои чувства и любые сомнения — абсолютно нормальные. Усталость, лень и тревога случаются со всеми.
+- **Рефрейминг**: Попробуй взглянуть на ситуацию бережно: мысль о сложности или нехватке ресурса — это просто автоматическая мысль, а не факт твоего поражения.
+- **Микро-действие**: Самый простой способ победить напряжение — это сделать крошечное полезное действие для твоих привычек: ${habitsNames}.
+
+### 🌱 Твоё бережное руководство:
+${habitsBullets}
+
+*Мы движемся маленькими бережными шагами. Твоя Sprout-команда всегда рядом!*`;
+  }
+
+  return topicReply;
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'sprout-secret-key-123';
 
 async function startServer() {
@@ -335,7 +440,12 @@ async function startServer() {
         reason: data.reason || "Каждое маленькое усилие сегодня поможет завтра."
       });
     } catch (error: any) {
-      console.error("Gemini adaptation error:", error);
+      const errMsg = error?.message || String(error || "");
+      if (errMsg.includes("location is not supported") || errMsg.includes("PRECONDITION") || error?.status === 400) {
+        console.warn("Gemini AI regional limitation: Falling back silently on adaptation advice.");
+      } else {
+        console.error("Gemini adaptation error:", error);
+      }
       res.json({
         name,
         description,
@@ -384,8 +494,13 @@ async function startServer() {
 
       const parsed = JSON.parse(response.text || '[]');
       res.json(parsed);
-    } catch (error) {
-      console.error("Gemini breakdown error:", error);
+    } catch (error: any) {
+      const errMsg = error?.message || String(error || "");
+      if (errMsg.includes("location is not supported") || errMsg.includes("PRECONDITION") || error?.status === 400) {
+        console.warn("Gemini AI regional limitation: Falling back silently on breakdown advice.");
+      } else {
+        console.error("Gemini breakdown error:", error);
+      }
       res.json([
         { name: "Микро-версия", description: `${goal} — делать по 2 минуты в день`, reason: "Начните с малого, чтобы преодолеть прокрастинацию." },
         { name: "Обычная версия", description: `${goal} — делать по 15 минут в день`, reason: "Оптимальный уровень нагрузки для закрепления привычки." },
@@ -477,8 +592,33 @@ async function startServer() {
       const reply = response.text || "Извините, сейчас я испытываю трудности с ответом. Попробуйте сформулировать мысль иначе — я всегда готов вас выслушать.";
       res.json({ reply });
     } catch (error: any) {
-      console.error("Gemini coach error:", error);
-      res.status(500).json({ error: "Не удалось получить совет от коуча." });
+      let warningPrefix = "";
+      const errMsg = error?.message || String(error || "");
+      const isLocationOrKeysError = errMsg.includes("location is not supported") || errMsg.includes("PRECONDITION") || error?.status === 400;
+
+      if (isLocationOrKeysError) {
+        console.warn("Gemini AI is unavailable in this region or credentials failed. Gracefully falling back to Sprout Local CBT Coach module.");
+        warningPrefix = `> **⚠️ Ограничение региона (Gemini API)**\n> \n> Google ИИ временно ограничивает прямой доступ к API из вашего текущего IP/региона (ограничения Google для некоторых типов аккаунтов). Sprout автоматически активировал **Локальный КПТ-Коуч Модуль**, работающий автономно.\n> Для полноценного оригинального ИИ-доступа подключите VPN и перенастройте ключ.\n\n`;
+      } else {
+        console.error("Gemini coach error:", error);
+        warningPrefix = `> **💡 Автономный КПТ-режим**\n> \n> Сервер Gemini временно недоступен или отсутствует ключ API в настройках. Активирован **Локальный КПТ-Коуч Модуль** с адаптивными подсказками.\n\n`;
+      }
+
+      // Fetch fallback content dynamically
+      let userDisplayName = "Пользователь";
+      let fallbackHabitsList: any[] = [];
+      try {
+        const [u] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+        if (u) {
+          userDisplayName = u.displayName || "Пользователь";
+        }
+        fallbackHabitsList = await db.select().from(schema.habits).where(eq(schema.habits.userId, userId));
+      } catch (dbErr) {
+        console.error("Failed to fetch info for fallback:", dbErr);
+      }
+
+      const fallbackReply = warningPrefix + getLocalCbtFallback(message, userDisplayName, fallbackHabitsList);
+      res.json({ reply: fallbackReply });
     }
   });
 

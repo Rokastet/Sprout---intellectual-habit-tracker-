@@ -27,6 +27,7 @@ import {
   Trash,
   History,
   Bell,
+  BellOff,
   Quote
 } from 'lucide-react';
 import { api, type User, type Habit, type HabitEntry } from './lib/api';
@@ -716,6 +717,141 @@ export default function App() {
     }, 3000);
   };
 
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'default';
+  });
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('sprout_notifications_enabled') !== 'false';
+    }
+    return true;
+  });
+  const [notifiedKeys, setNotifiedKeys] = useState<Record<string, boolean>>({});
+
+  // Local notification scheduler loop
+  useEffect(() => {
+    if (!user || !notificationsEnabled || notifPermission !== 'granted') return;
+
+    const checkReminders = () => {
+      const now = new Date();
+      const currentHHMM = format(now, 'HH:mm'); // e.g. "14:30"
+      const todayYMD = format(now, 'yyyy-MM-dd'); // e.g. "2026-05-24"
+      
+      // Monday = 0, Sunday = 6 mapping
+      const jsDay = now.getDay();
+      const appDay = jsDay === 0 ? 6 : jsDay - 1;
+
+      habits.forEach(habit => {
+        if (!habit.reminderTime) return;
+
+        // Verify days if specified
+        if (habit.reminderDays) {
+          try {
+            const parsedDays: number[] = JSON.parse(habit.reminderDays);
+            if (!parsedDays.includes(appDay)) return;
+          } catch (e) {
+            console.error('Failed to parse reminderDays for habit', habit.id, e);
+          }
+        }
+
+        // Compare time
+        if (habit.reminderTime === currentHHMM) {
+          // Check if already completed today
+          const isCompletedToday = entries.some(
+            e => e.habitId === habit.id && e.date === todayYMD && (e.completed || e.isFreeze)
+          );
+          if (isCompletedToday) return;
+
+          // Double trigger guard for this minute
+          const triggerKey = `${habit.id}_${todayYMD}_${currentHHMM}`;
+          if (notifiedKeys[triggerKey]) return;
+
+          // Track that we triggered to avoid duplicate runs
+          setNotifiedKeys(prev => ({ ...prev, [triggerKey]: true }));
+
+          // Trigger browser notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              const notification = new Notification(`Время для привычки Sprout! 🌿`, {
+                body: `Напомним: пора выполнить «${habit.name}»! ${habit.description ? `\nОписание: ${habit.description}` : ''}`,
+                icon: '/favicon.ico',
+                tag: `habit-${habit.id}`
+              });
+
+              notification.onclick = () => {
+                window.focus();
+                setView('dashboard');
+              };
+            } catch (err) {
+              console.error('Failed to trigger browser notification:', err);
+            }
+          }
+
+          // Trigger in-app toast for active webpage experience
+          addToast(`Напоминание: Время выполнить «${habit.name}»!`, 'info');
+        }
+      });
+    };
+
+    // Run interval every 30 seconds for quick & precise checks
+    const intervalId = setInterval(checkReminders, 30000);
+    // Also run immediately on changes to catch any exact-minute matches
+    checkReminders();
+
+    return () => clearInterval(intervalId);
+  }, [user, habits, entries, notificationsEnabled, notifPermission, notifiedKeys]);
+
+  const handleToggleNotifications = async () => {
+    if (!('Notification' in window)) {
+      addToast('Ваш браузер не поддерживает всплывающие уведомления.', 'error');
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      addToast('Доступ заблокирован. Пожалуйста, разрешите уведомления в настройках сайта.', 'error');
+      return;
+    }
+
+    if (Notification.permission === 'default') {
+      try {
+        const permission = await Notification.requestPermission();
+        setNotifPermission(permission);
+        if (permission === 'granted') {
+          setNotificationsEnabled(true);
+          localStorage.setItem('sprout_notifications_enabled', 'true');
+          addToast('Отлично! Уведомления успешно активированы 🔔');
+          
+          // Trigger a test notification to welcome them
+          new Notification('Уведомления Sprout активны! 🌿', {
+            body: 'Мы будем присылать напоминания о ваших привычках вовремя!',
+            icon: '/favicon.ico'
+          });
+        } else {
+          addToast('Вы отклонили запрос на отправку уведомлений.', 'info');
+        }
+      } catch (err) {
+        console.error('Notification permission request error:', err);
+        addToast('Не удалось запросить разрешение на уведомления.', 'error');
+      }
+      return;
+    }
+
+    // If permission is already granted, toggle enabled status
+    if (Notification.permission === 'granted') {
+      const nextState = !notificationsEnabled;
+      setNotificationsEnabled(nextState);
+      localStorage.setItem('sprout_notifications_enabled', String(nextState));
+      if (nextState) {
+        addToast('Напоминания о привычках включены! 🔔', 'success');
+      } else {
+        addToast('Напоминания временно отключены 🔕', 'info');
+      }
+    }
+  };
+
   const handleAdaptHabit = async (habit: Habit) => {
     setLoading(true);
     try {
@@ -774,8 +910,8 @@ export default function App() {
         } else {
           setLoading(false);
         }
-      } catch (err) {
-        console.error('Init failed:', err);
+      } catch (err: any) {
+        console.info('Session verification: token is invalid or database was reset. Quietly logging out... Original message:', err?.message || err);
         api.setToken(null);
         setUser(null);
         setLoading(false);
@@ -943,8 +1079,32 @@ export default function App() {
             <span className="font-bold text-lg">{user.freezesCount}</span>
           </div>
           <button 
+            onClick={handleToggleNotifications}
+            title={
+              notifPermission === 'default' ? "Включить уведомления" :
+              notifPermission === 'denied' ? "Уведомления заблокированы сайтом" :
+              notificationsEnabled ? "Выключить уведомления" : "Включить уведомления"
+            }
+            className={cn(
+              "p-4 bg-white dark:bg-sprout-dark-card rounded-3xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-neutral-100 dark:border-sprout-dark-border transition-all hover:scale-105 active:scale-95 flex items-center justify-center relative",
+              notifPermission === 'granted' && notificationsEnabled 
+                ? "text-sprout-olive dark:text-sprout-soft" 
+                : "text-neutral-400"
+            )}
+          >
+            {notifPermission === 'granted' && notificationsEnabled ? (
+              <>
+                <Bell className="w-6 h-6 fill-sprout-olive/10" />
+                <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-sprout-olive dark:bg-sprout-soft rounded-full animate-ping" />
+                <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-sprout-olive dark:bg-sprout-soft rounded-full" />
+              </>
+            ) : (
+              <BellOff className="w-6 h-6" />
+            )}
+          </button>
+          <button 
             onClick={toggleTheme}
-            className="p-4 bg-white dark:bg-sprout-dark-card text-neutral-400 hover:text-sprout-olive rounded-3xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-neutral-100 dark:border-sprout-dark-border transition-all hover:scale-105 active:scale-95"
+            className="p-4 bg-white dark:bg-sprout-dark-card text-neutral-400 hover:text-sprout-olive rounded-3xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-neutral-100 dark:border-sprout-dark-border transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
           >
             {user.theme === 'light' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
           </button>

@@ -50,8 +50,32 @@ const COGNITIVE_DISTORTIONS = [
   }
 ];
 
+// Define safe module-level cache variables (in memory, discarded on reload or logout token change)
+let sessionMessagesCache: Message[] | null = null;
+let sessionUserTokenCache: string | null = null;
+
 export function CbtCoach() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const currentToken = api.getToken();
+
+  const [messages, setMessages] = useState<Message[]>(() => {
+    // If token changed (e.g. user logged out or logged in with a different account), clear internal cache
+    if (sessionUserTokenCache !== currentToken) {
+      sessionMessagesCache = null;
+      sessionUserTokenCache = currentToken;
+    }
+
+    if (sessionMessagesCache && sessionMessagesCache.length > 0) {
+      return sessionMessagesCache;
+    }
+
+    return [
+      {
+        role: 'model',
+        content: `Привет! Я твой персональный **Sprout КПТ-Коуч**. 🌿\n\nКогда опускаются руки, лень идти к целям или накатывает усталость, я помогу разложить мысли по полочкам с помощью научных методов **когнитивно-поведенческой терапии (КПТ)**.\n\nВместе мы выявим мешающие автоматические мысли и найдём вдохновение для маленьких, но уверенных шагов. Расскажи мне, с какой трудностью ты столкнулся прямо сейчас, или воспользуйся быстрой подсказкой выше!`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,35 +84,26 @@ export function CbtCoach() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load chat session if persists
+  // Sync component state with global session caches if token suddenly changes while mounted
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('sprout_cbt_coach_history');
-      if (saved) {
-        setMessages(JSON.parse(saved));
-      } else {
-        // Welcoming starter message
-        setMessages([
-          {
-            role: 'model',
-            content: `Привет! Я твой персональный **Sprout КПТ-Коуч**. 🌿\n\nКогда опускаются руки, лень идти к целям или накатывает усталость, я помогу разложить мысли по полочкам с помощью научных методов **когнитивно-поведенческой терапии (КПТ)**.\n\nВместе мы выявим мешающие автоматические мысли и найдём вдохновение для маленьких, но уверенных шагов. Расскажи мне, с какой трудностью ты столкнулся прямо сейчас, или воспользуйся быстрой подсказкой выше!`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]);
-      }
-    } catch (e) {
-      console.error('Failed to parse chat logs:', e);
+    if (sessionUserTokenCache !== currentToken) {
+      sessionMessagesCache = null;
+      sessionUserTokenCache = currentToken;
+      setMessages([
+        {
+          role: 'model',
+          content: `Привет! Я твой персональный **Sprout КПТ-Коуч**. 🌿\n\nКогда опускаются руки, лень идти к целям или накатывает усталость, я помогу разложить мысли по полочкам с помощью научных методов **когнитивно-поведенческой терапии (КПТ)**.\n\nВместе мы выявим мешающие автоматические мысли и найдём вдохновение для маленьких, но уверенных шагов. Расскажи мне, с какой трудностью ты столкнулся прямо сейчас, или воспользуйся быстрой подсказкой выше!`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
     }
-  }, []);
+  }, [currentToken]);
 
-  // Sync messages into LocalStorage
+  // Sync messages into state (persistence removed to keep sessions fresh)
   const saveMessages = (updated: Message[]) => {
     setMessages(updated);
-    try {
-      localStorage.setItem('sprout_cbt_coach_history', JSON.stringify(updated));
-    } catch (e) {
-      console.error('Failed to save chat logs:', e);
-    }
+    sessionMessagesCache = updated;
+    sessionUserTokenCache = api.getToken();
   };
 
   const scrollToBottom = () => {
